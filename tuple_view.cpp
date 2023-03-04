@@ -4,6 +4,7 @@
 #include <tuple>
 #include <iostream>
 #include <utility>
+#include <bit>
 
 namespace rg = std::ranges;
 
@@ -30,12 +31,10 @@ namespace detail
 } // namespace detail
 
 
-template<std::size_t, typename Container>
-class group_view;
-
-template<std::size_t N, template<typename,typename> typename Container, typename T, typename Allocator>
-class group_view<N, Container<T, Allocator>> : public rg::view_interface<group_view<N, Container<T, Allocator>>> {
-    using container_t = Container<T, Allocator>;
+template<std::size_t N, rg::input_range V>
+class group_view {
+    using container_t = V;
+    using T = typename V::value_type;
     
     const container_t& m_cont;
 
@@ -67,7 +66,7 @@ public:
     public:
         iterator() = default;
         iterator(const container_t* cont, typename container_t::const_iterator iter) : m_cont{ cont }, m_iter{ iter } {}
-        iterator(const container_t* cont, sentinel_t) : m_cont{ cont }, m_iter{ m_cont->cend() } {}
+        iterator(const container_t* cont, sentinel_t) : m_cont{ cont }, m_iter{ std::cend(*m_cont) } {}
 
         value_type operator*() { 
             return fill_tuple(std::make_index_sequence<N>{});
@@ -79,7 +78,7 @@ public:
         }
 
         iterator operator++(int) const {
-            const auto ret = *this;
+            auto ret = *this;
             ++(*this);
             return ret;
         }
@@ -93,7 +92,7 @@ public:
         }
 
         bool operator==(sentinel_t) const noexcept {
-            return m_iter == m_cont->end();
+            return m_iter == std::cend(m_cont);
         }
 
         bool operator!=(sentinel_t) const noexcept {
@@ -102,26 +101,15 @@ public:
     };
 
     group_view(const container_t& cont) : m_cont{ cont } {}
-    auto begin() const { return iterator{ &m_cont, m_cont.cbegin() }; }
+    auto begin() const { return iterator{ &m_cont, std::cbegin(m_cont) }; }
     auto end() const { return iterator{ &m_cont, sentinel }; }
 };
 
-
-//emplate<std::size_t N, template<typename,typename> typename Container, typename T, typename Allocator>
-//group_view(const Container<T, Allocator>&) -> group_view<N, Container<T, Allocator>>;
-
-
 int main() {
-    //static_assert(std::is_same_v<detail::repeat_type<int, 5, std::tuple>::type, std::tuple<int,int,int,int,int>>);td::
-    std::vector<int> v{ 10, 20, 30 };
+    std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
     group_view<3, std::vector<int>> gv{ v };
-
-    int j = 10;
-
-    const auto t = v | group_view<3, std::vector<int>>;
 
     for (auto tup : gv) {
         std::cout << std::get<0>(tup) << ", " << std::get<1>(tup) << ", " << std::get<2>(tup) << "\n";
-        //break;
     }
 }
