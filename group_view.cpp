@@ -112,7 +112,7 @@ public:
         static_assert(std::sentinel_for<rg::iterator_t<V>, iterator>);
     }
     auto begin() const { return begin_; }
-    auto end() const { return sentinel; }
+    auto end() const { return end_; }
 
 private:
     V m_base;
@@ -138,7 +138,6 @@ static inline constexpr auto group = group_view_fn<N>{};
 int main() {
     std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
     auto gv = group<3>(v);
-    //auto vvv = rg::views::all(v);
 
     static_assert(rg::view<decltype(gv)>);
 
