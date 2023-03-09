@@ -32,28 +32,31 @@ namespace detail
 
 
 template<std::size_t N, rg::input_range V>
-class group_view {
+requires rg::view<V>
+class group_view : public rg::view_interface<group_view<N, V>> {
     using container_t = V;
-    using T = typename V::value_type;
-    
-    const container_t& m_cont;
+    using T = rg::iterator_t<V>::value_type;
 
 public:
+    using difference_type = std::iter_difference_t<std::ranges::iterator_t<V>>;
+
     struct sentinel_t {};
     static inline constexpr sentinel_t sentinel{};
 
     class iterator {
-        using difference_type = std::ptrdiff_t;
+    public: // <-- important
+        using difference_type = std::iter_difference_t<std::ranges::iterator_t<V>>;
         using value_type = typename detail::repeat_type<std::add_lvalue_reference_t<std::add_const_t<T>>, N, std::tuple>::type;
         using pointer = value_type*;
-        using reference = value_type&;
+        using reference = value_type&&;
         using iterator_category	= std::input_iterator_tag;
 
-        const container_t* m_cont{};
-        typename container_t::const_iterator m_iter{};
+    private:
+        const V* m_cont{};
+        rg::iterator_t<V> m_iter{};
 
         template<std::size_t>
-        static decltype(auto) getIterValue(typename container_t::const_iterator& where) noexcept(noexcept(std::declval<typename container_t::const_iterator>()++)) {
+        static decltype(auto) getIterValue(rg::iterator_t<V>& where) noexcept(noexcept(std::declval<rg::iterator_t<V>>()++)) {
             return *where++;
         }
 
@@ -65,10 +68,10 @@ public:
 
     public:
         iterator() = default;
-        iterator(const container_t* cont, typename container_t::const_iterator iter) : m_cont{ cont }, m_iter{ iter } {}
-        iterator(const container_t* cont, sentinel_t) : m_cont{ cont }, m_iter{ std::cend(*m_cont) } {}
+        iterator(const V* cont, rg::iterator_t<V> iter) : m_cont{ cont }, m_iter{ iter } {}
+        iterator(const V* cont, sentinel_t) : m_cont{ cont }, m_iter{ std::cend(*m_cont) } {}
 
-        value_type operator*() { 
+        value_type operator*() const {  // <-- const important!
             return fill_tuple(std::make_index_sequence<N>{});
         }
 
@@ -98,16 +101,46 @@ public:
         bool operator!=(sentinel_t) const noexcept {
             return not(m_iter == sentinel);
         }
+
+        bool operator==(rg::iterator_t<V> rhs) const {
+            return m_iter == rhs;
+        }
     };
 
-    group_view(const container_t& cont) : m_cont{ cont } {}
-    auto begin() const { return iterator{ &m_cont, std::cbegin(m_cont) }; }
-    auto end() const { return iterator{ &m_cont, sentinel }; }
+    group_view(V cont) : m_base{ std::move(cont) }, begin_{ iterator{ &m_base, std::cbegin(cont) } }, end_{ iterator{ &m_base, std::cend(cont) } } {
+        static_assert(std::input_iterator<iterator>);
+        static_assert(std::sentinel_for<rg::iterator_t<V>, iterator>);
+    }
+    auto begin() const { return begin_; }
+    auto end() const { return sentinel; }
+
+private:
+    V m_base;
+    iterator begin_{};
+    iterator end_{};
 };
+
+template<std::size_t N>
+struct group_view_fn {
+    template<rg::viewable_range R>
+    constexpr auto operator()(R&& range) const 
+        -> group_view<N, rg::views::all_t<R>>
+    {
+        return group_view<N, rg::views::all_t<R>>{ rg::views::all(std::forward<R>(range)) };
+    }
+};
+
+template<std::size_t N>
+static inline constexpr auto group = group_view_fn<N>{};
+
+
 
 int main() {
     std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
-    group_view<3, std::vector<int>> gv{ v };
+    auto gv = group<3>(v);
+    //auto vvv = rg::views::all(v);
+
+    static_assert(rg::view<decltype(gv)>);
 
     for (auto tup : gv) {
         std::cout << std::get<0>(tup) << ", " << std::get<1>(tup) << ", " << std::get<2>(tup) << "\n";
