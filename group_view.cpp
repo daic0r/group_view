@@ -34,13 +34,10 @@ namespace detail
 template<std::size_t N, rg::input_range V>
 requires rg::view<V>
 class group_view : public rg::view_interface<group_view<N, V>> {
-    using T = rg::iterator_t<V>::value_type;
+    using T = typename std::iterator_traits<rg::iterator_t<V>>::value_type;
 
 public:
     using difference_type = std::iter_difference_t<std::ranges::iterator_t<V>>;
-
-    struct sentinel_t {};
-    static constexpr inline constexpr sentinel_t sentinel{};
 
     class iterator {
     public: // <-- important
@@ -55,7 +52,7 @@ public:
         rg::iterator_t<V> m_iter{};
 
         template<std::size_t>
-        static constexpr decltype(auto) getIterValue(rg::iterator_t<V>& where) noexcept(noexcept(std::declval<rg::iterator_t<V>>()++)) {
+        static constexpr decltype(auto) getIterValue(rg::iterator_t<V>& where) noexcept {
             return *where++;
         }
 
@@ -68,7 +65,6 @@ public:
     public:
         constexpr iterator() = default;
         constexpr iterator(const V* cont, rg::iterator_t<V> iter) : m_cont{ cont }, m_iter{ iter } {}
-        constexpr iterator(const V* cont, sentinel_t) : m_cont{ cont }, m_iter{ std::cend(*m_cont) } {}
 
         constexpr value_type operator*() const {  // <-- const important!
             return fill_tuple(std::make_index_sequence<N>{});
@@ -93,12 +89,12 @@ public:
             return not(lhs.m_iter == rhs.m_iter);
         }
 
-        constexpr bool operator==(sentinel_t) const noexcept {
+        constexpr bool operator==(std::unreachable_sentinel_t) const noexcept {
             return m_iter == std::cend(m_cont);
         }
 
-        constexpr bool operator!=(sentinel_t) const noexcept {
-            return not(m_iter == sentinel);
+        constexpr bool operator!=(std::unreachable_sentinel_t) const noexcept {
+            return not(*this == std::unreachable_sentinel);
         }
 
         constexpr bool operator==(rg::iterator_t<V> rhs) const {
@@ -133,7 +129,8 @@ template<std::size_t N>
 static inline constexpr auto group = group_view_fn<N>{};
 
 int main() {
-    std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
+    //std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
+    std::array<int, 9> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
     auto gv = group<3>(v);
 
     static_assert(rg::view<decltype(gv)>);
