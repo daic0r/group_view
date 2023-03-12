@@ -130,11 +130,14 @@ int main() {
     //int v[] ={ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
     std::vector<int> v{ 11, 20, 30, 104, 200, 300, 120, 140, 920 };
     //std::array<int, 9> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
-    auto gv = v | ice::views::group<3> | std::views::filter([](auto const& tup){ return std::get<0>(tup) % 10 == 0; });
+    auto gv = 
+        v 
+        | ice::views::group<3>
+        | std::views::filter([](auto const& tup){ return std::get<0>(tup) % 10 == 0; });
 
-    static_assert(rg::view<decltype(gv)>);
+    static_assert(rg::view<decltype(ice::views::group<3>(v))>);
 
-    for (auto tup : gv) {
-        std::cout << std::get<0>(tup) << ", " << std::get<1>(tup) << ", " << std::get<2>(tup) << "\n";
+    for (auto [x,y,z] : gv) {
+        std::cout << x << ", " << y << ", " << z << "\n";
     }
 }
