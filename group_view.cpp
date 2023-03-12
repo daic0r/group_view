@@ -48,7 +48,6 @@ public:
         using iterator_category	= std::input_iterator_tag;
 
     private:
-        const V* m_cont{};
         rg::iterator_t<V> m_iter{};
 
         template<std::size_t>
@@ -64,7 +63,7 @@ public:
 
     public:
         constexpr iterator() = default;
-        constexpr iterator(const V* cont, rg::iterator_t<V> iter) : m_cont{ cont }, m_iter{ iter } {}
+        constexpr iterator(rg::iterator_t<V> iter) :  m_iter{ iter } {}
 
         constexpr value_type operator*() const {  // <-- const important!
             return fill_tuple(std::make_index_sequence<N>{});
@@ -81,20 +80,9 @@ public:
             return ret;
         }
 
+        // Must be friend
         friend constexpr bool operator==(iterator const& lhs, iterator const& rhs) noexcept {
             return lhs.m_iter == rhs.m_iter;
-        }
-
-        friend constexpr bool operator!=(iterator const& lhs, iterator const& rhs) noexcept {
-            return not(lhs.m_iter == rhs.m_iter);
-        }
-
-        constexpr bool operator==(std::unreachable_sentinel_t) const noexcept {
-            return m_iter == std::cend(m_cont);
-        }
-
-        constexpr bool operator!=(std::unreachable_sentinel_t) const noexcept {
-            return not(*this == std::unreachable_sentinel);
         }
 
         constexpr bool operator==(rg::iterator_t<V> rhs) const {
@@ -102,7 +90,7 @@ public:
         }
     };
 
-    constexpr group_view(V cont) : m_base{ std::move(cont) }, begin_{ iterator{ &m_base, std::cbegin(cont) } }, end_{ iterator{ &m_base, std::cend(cont) } } {
+    constexpr group_view(V cont) : m_base{ std::move(cont) }, begin_{ iterator{ std::cbegin(cont) } }, end_{ iterator{ std::cend(cont) } } {
         static_assert(std::input_iterator<iterator>);
         static_assert(std::sentinel_for<rg::iterator_t<V>, iterator>);
     }
@@ -123,15 +111,23 @@ struct group_view_fn {
     {
         return group_view<N, rg::views::all_t<R>>{ rg::views::all(std::forward<R>(range)) };
     }
+
+    template<rg::viewable_range R>
+    friend constexpr auto operator|(R&& range, group_view_fn const& fn)
+        -> group_view<N, rg::views::all_t<R>>
+    {
+        return fn(std::forward<R>(range));
+    }
 };
 
 template<std::size_t N>
 static inline constexpr auto group = group_view_fn<N>{};
 
 int main() {
-    //std::vector<int> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
-    std::array<int, 9> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
-    auto gv = group<3>(v);
+    //int v[] ={ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
+    std::vector<int> v{ 11, 20, 30, 104, 200, 300, 120, 140, 920 };
+    //std::array<int, 9> v{ 10, 20, 30, 100, 200, 300, 120, 140, 920 };
+    auto gv = v | group<3> | std::views::filter([](auto const& tup){ return std::get<0>(tup) % 10 == 0; });
 
     static_assert(rg::view<decltype(gv)>);
 
